@@ -262,8 +262,15 @@ bBoth.onclick=()=>mode('both');bPt.onclick=()=>mode('pt');bHt.onclick=()=>mode('
 
 // ---- pan / zoom ----
 let s=1,tx=0,ty=0;
-var MOB=(window.matchMedia&&window.matchMedia('(max-width:860px)').matches)?1.3:1;
-function rescaleMk(){document.querySelectorAll('#mks .mk').forEach(function(c){var br=+c.getAttribute('data-r');c.setAttribute('r',(br*MOB*Math.pow(s,-1.5)).toFixed(2));});document.querySelectorAll('#mks .hit').forEach(function(h){h.setAttribute('r',(13*MOB/s).toFixed(2));});}
+function MOBILE(){return !!(window.matchMedia&&window.matchMedia('(max-width:860px)').matches);}
+function ctmA(){var m=svg.getScreenCTM();if(m&&m.a)return m.a;var w=svg.clientWidth,h=svg.clientHeight;return Math.min(w/614,h/940)||1;}
+window.addEventListener('resize',function(){if(typeof apply==='function')apply();});
+function rescaleMk(){var mob=MOBILE(),a=ctmA();
+ document.querySelectorAll('#mks .mk').forEach(function(c){var br=+c.getAttribute('data-r');
+  var rs=mob?(Math.min(6.5,Math.max(3,br*1.1*Math.pow(s,-0.18)))/(a*s)):(br*Math.pow(s,-1.5));
+  c.setAttribute('r',rs.toFixed(2));});
+ document.querySelectorAll('#mks .hit').forEach(function(h){
+  var rs=mob?(18/(a*s)):(13/s);h.setAttribute('r',rs.toFixed(2));});}
 var LBL=[];(function(){var NS='http://www.w3.org/2000/svg';
  document.querySelectorAll('#mks .mklab').forEach(function(e){e.remove();});
  var boost={'Sài Gòn':1,'Đà Lạt':1,'Cần Thơ':1,'Cà Mau':1,'Hà Tĩnh':1,'Phú Xuyên':1,'Hà Tiên':1,'Nam Đông':1,'Châu Đốc':1,'Vũng Tàu':1};
@@ -282,12 +289,15 @@ var LBL=[];(function(){var NS='http://www.w3.org/2000/svg';
   h.addEventListener('click',function(e){e.stopPropagation();openSlip(idx,c);});});})();
 function ov(a,b){return !(a.x2<b.x1||b.x2<a.x1||a.y2<b.y1||b.y2<a.y1);}
 function fontFor(z){var P=[[1,11.5],[3,8.2],[7,10.5],[8,10.5]];if(z<=P[0][0])return P[0][1];if(z>=P[P.length-1][0])return P[P.length-1][1];for(var i=0;i<P.length-1;i++){if(z<=P[i+1][0]){var a=P[i],b=P[i+1];return a[1]+(b[1]-a[1])*(z-a[0])/(b[0]-a[0]);}}return P[P.length-1][1];}
-function placeLabels(){var FS=Math.max(5,fontFor(s))*MOB,gap=3,placed=[];
- LBL.forEach(function(l){var px=l.cx*s+tx,py=l.cy*s+ty,r=l.br*MOB*Math.pow(s,-0.5)+1.2;
+function placeLabels(){var mob=MOBILE(),a=ctmA(),placed=[];
+ var FS=mob?(Math.min(14,Math.max(10.5,fontFor(s)*1.1))/a):Math.max(5,fontFor(s));
+ function mr(br){return mob?(Math.min(6.5,Math.max(3,br*1.1*Math.pow(s,-0.18)))/a):(br*Math.pow(s,-0.5));}
+ var gapX=mob?(4/a):5,gapY=mob?(3/a):3;
+ LBL.forEach(function(l){var px=l.cx*s+tx,py=l.cy*s+ty,r=mr(l.br)+1.2;
   placed.push({x1:px-r,y1:py-r,x2:px+r,y2:py+r});});
  LBL.forEach(function(l){var px=l.cx*s+tx,py=l.cy*s+ty;
   if(px<-30||px>W+30||py<-20||py>H+20){l.el.style.display='none';return;}
-  var r=l.br*MOB*Math.pow(s,-0.5),w=l.text.length*FS*0.5,offX=r+5,offY=r+3;
+  var r=mr(l.br),w=l.text.length*FS*0.5,offX=r+gapX,offY=r+gapY;
   var bx={x1:px+offX,y1:py-offY-FS*0.72,x2:px+offX+w,y2:py-offY+FS*0.25},ok=true;
   for(var i=0;i<placed.length;i++){if(ov(bx,placed[i])){ok=false;break;}}
   if(ok){placed.push(bx);l.el.style.display='';
@@ -297,7 +307,7 @@ function placeLabels(){var FS=Math.max(5,fontFor(s))*MOB,gap=3,placed=[];
   else{l.el.style.display='none';}});}function apply(){scene.setAttribute('transform',`translate(${tx} ${ty}) scale(${s})`);rescaleMk();placeLabels();var zv=document.getElementById('zval');if(zv)zv.textContent='×'+s.toFixed(1);}
 function toSvg(e){const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;
   return p.matrixTransform(svg.getScreenCTM().inverse());}
-function zoomAt(cx,cy,f){const ns=Math.min(8,Math.max(1,s*f));
+function zoomAt(cx,cy,f){const ns=Math.min(20,Math.max(1,s*f));
   tx=cx-(cx-tx)*(ns/s);ty=cy-(cy-ty)*(ns/s);s=ns;apply();}
 svg.addEventListener('wheel',e=>{e.preventDefault();const q=toSvg(e);zoomAt(q.x,q.y,e.deltaY<0?1.15:1/1.15);},{passive:false});
 var ptrs=new Map(),moved=false,pinch=null;
@@ -312,7 +322,7 @@ svg.addEventListener('pointermove',e=>{
   if(ptrs.size>=2&&pinch){var p=[...ptrs.values()];
     var d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),mx=(p[0].x+p[1].x)/2,my=(p[0].y+p[1].y)/2;
     tx+=mx-pinch.mx;ty+=my-pinch.my;
-    var ns=Math.min(8,Math.max(1,s*(d/pinch.d)));
+    var ns=Math.min(20,Math.max(1,s*(d/pinch.d)));
     tx=mx-(mx-tx)*(ns/s);ty=my-(my-ty)*(ns/s);s=ns;
     pinch={d:d,mx:mx,my:my};moved=true;apply();}
   else if(ptrs.size===1){tx+=q.x-prev.x;ty+=q.y-prev.y;moved=true;apply();}});
